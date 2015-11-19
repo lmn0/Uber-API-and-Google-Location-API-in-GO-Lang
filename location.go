@@ -10,12 +10,15 @@ import (
     "gopkg.in/mgo.v2"
     "gopkg.in/mgo.v2/bson"
     "strconv"
+    "github.com/anweiss/uber-api-golang/uber"
     //"bytes"
 )
 
 //func hello(rw http.ResponseWriter, req *http.Request, p httprouter.Params) {
 //    fmt.Fprintf(rw, "Hello, %s!\n", p.ByName("name"))
 //}
+
+// MongoLab Auth : mongodb://tjs:password@ds039684.mongolab.com:39684/mongo
 
 type reqObj struct{
 Id int
@@ -71,6 +74,8 @@ Greeting string
 
 func createlocation(rw http.ResponseWriter, req *http.Request, p httprouter.Params) {
     id=id+1;
+
+
     decoder := json.NewDecoder(req.Body)
     var t reqObj 
     t.Id = id; 
@@ -78,6 +83,8 @@ func createlocation(rw http.ResponseWriter, req *http.Request, p httprouter.Para
     if err != nil {
         fmt.Println("Error")
     }
+
+
     //lstring := strings.Split(t.Loc," ");
     st:=strings.Join(strings.Split(t.Address," "),"+");
     fmt.Println(st);
@@ -107,7 +114,7 @@ func createlocation(rw http.ResponseWriter, req *http.Request, p httprouter.Para
 
 //Mongo Persistence
 
- conn, err := mgo.Dial("mongodb://tjs:password@ds039684.mongolab.com:39684/mongo")
+ conn, err := mgo.Dial("mongodb://localhost:27017/mongo")
 
     // Check if connection error, is mongo running?
     if err != nil {
@@ -135,7 +142,7 @@ id ,err1:= strconv.Atoi(p.ByName("locid"))
 if err1 != nil {
         panic(err1)
     }
- conn, err := mgo.Dial("mongodb://tjs:password@ds039684.mongolab.com:39684/mongo")
+ conn, err := mgo.Dial("mongodb://localhost:27017/mongo")
 
     // Check if connection error, is mongo running?
     if err != nil {
@@ -177,7 +184,7 @@ func updateloc(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
  if err1 != nil {
          panic(err1)
      }
-  conn, err := mgo.Dial("mongodb://tjs:password@ds039684.mongolab.com:39684/mongo")
+  conn, err := mgo.Dial("mongodb://localhost:27017/mongo")
 
 //     // Check if connection error, is mongo running?
      if err != nil {
@@ -187,12 +194,7 @@ func updateloc(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
 
 conn.SetMode(mgo.Monotonic,true);
  c:=conn.DB("test").C("details");
-// fmt.Println(conn);
-//result:=reqObj{}
-// err = c.Find(bson.M{"id":id}).One(&result)
-// if err != nil {
-//                 fmt.Println(err)
-//         }
+
 
      decoder := json.NewDecoder(req.Body)
      var t modReqObj  
@@ -201,10 +203,7 @@ conn.SetMode(mgo.Monotonic,true);
          fmt.Println("Error")
      }
 
-//     result.Address=t.Address; -
-//     result.City=t.City;
-//     result.State=t.State;
-//     result.Zip=t.Zip; -
+
      colQuerier := bson.M{"id": id}
      change := bson.M{"$set": bson.M{"address": t.Address, "city":t.City,"state":t.State,"zip":t.Zip}}
      err = c.Update(colQuerier, change)
@@ -220,7 +219,7 @@ func deleteloc(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
  if err1 != nil {
          panic(err1)
      }
-  conn, err := mgo.Dial("mongodb://tjs:password@ds039684.mongolab.com:39684/mongo")
+  conn, err := mgo.Dial("mongodb://localhost:27017/mongo")
   conn.SetMode(mgo.Monotonic,true);
 c:=conn.DB("test").C("details");
 
@@ -234,11 +233,113 @@ c:=conn.DB("test").C("details");
     rw.WriteHeader(http.StatusNoContent)
 }
 
+type userUber struct {
+    LocationIds            []string `json:"location_ids"`
+    StartingFromLocationID string   `json:"starting_from_location_id"`
+}
+
+func plantrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
+
+    decoder := json.NewDecoder(req.Body)
+    var uUD userUber 
+    err := decoder.Decode(&uUD)
+    if err != nil {
+        fmt.Println("Error")
+    }
+
+        fmt.Println(uUD.StartingFromLocationID);
+
+
+///UBERRRRRR !!!!
+    var options uber.RequestOptions;
+    options.ServerToken= "S37TkXJu1TBNbDea22MxgIAjoM1C__fJ3r6vbQ-5";
+    options.ClientId= "5-BNiHDpt1CZvQoWd2G2vV2GSvSnIu2j";
+    options.ClientSecret= "P5qyGJI-sJw5m-s2kFHljzg59kccexZ8qkbaL44P";
+    options.AppName= "CMPE273-A3";
+    options.BaseUrl= "https://sandbox-api.uber.com/v1/";
+    
+
+    client := uber.Create(&options);
+
+//Quering for the locations: start and the rest
+        sid ,err1:= strconv.Atoi(uUD.StartingFromLocationID)
+ //fmt.Println(id);
+ if err1 != nil {
+         panic(err1)
+     }
+
+    conn, err := mgo.Dial("mongodb://localhost:27017/mongo");
+
+    // Check if connection error, is mongo running?
+    if err != nil {
+        panic(err)
+    }
+    defer conn.Close();
+
+    conn.SetMode(mgo.Monotonic,true);
+    c:=conn.DB("test").C("details");
+    result:=reqObj{}
+    err = c.Find(bson.M{"id":sid}).One(&result)
+    if err != nil {
+                fmt.Println(err)
+        }
+
+    // distance := []int{};
+    // price :=[]float64{};
+    index:=0;
+    // totalPrice := 0.0;
+    // totalDistance :=0.0;
+    // totalDuration :=0.0;
+
+    for _,ids := range uUD.LocationIds{
+    
+        lid,err1:= strconv.Atoi(ids)
+            //fmt.Println(id);
+        if err1 != nil {
+            panic(err1)
+        }
+        
+
+        resultLID:=reqObj{}
+        err = c.Find(bson.M{"id":lid}).One(&resultLID)
+        if err != nil {
+             fmt.Println(err)
+        }
+        pe := &uber.PriceEstimates{}
+        pe.StartLatitude = result.Coordinates.Lat;
+        pe.StartLongitude = result.Coordinates.Lng;
+        pe.EndLatitude = resultLID.Coordinates.Lat;
+        pe.EndLongitude = resultLID.Coordinates.Lng;
+
+        if e := client.Get(pe); e != nil {
+            fmt.Println(e);
+        }
+        fmt.Println("\nHere are the Uber price estimates from The White House to the United States Capitol: \n")
+    for _, price := range pe.Prices {
+        fmt.Println(price.DisplayName + ": " + price.Estimate + "; Surge: " + strconv.FormatFloat(price.SurgeMultiplier, 'f', 2, 32))
+    }
+        index=index+1;
+    }
+    
+
+    // fmt.Println(result.City);
+
+
+
+
+    }
+
 func main() {
     mux := httprouter.New()
     //mux.GET("/hello/:name", hello)
+
+    /// Uber
+    
+
+    ///
     id=0;
     mux.POST("/locations",createlocation)
+    mux.POST("/trips",plantrip)
     mux.GET("/locations/:locid",getloc)
     mux.PUT("/locations/:locid",updateloc)
     mux.DELETE("/locations/:locid",deleteloc)
