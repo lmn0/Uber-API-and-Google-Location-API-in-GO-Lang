@@ -288,7 +288,7 @@ func plantrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
     // price :=[]float64{};
     index:=0;
     // totalPrice := 0.0;
-    // totalDistance :=0.0;
+    totalDistance :=0.0;
     // totalDuration :=0.0;
 
     for _,ids := range uUD.LocationIds{
@@ -314,15 +314,18 @@ func plantrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
         if e := client.Get(pe); e != nil {
             fmt.Println(e);
         }
-        fmt.Println("\nHere are the Uber price estimates from The White House to the United States Capitol: \n")
+        fmt.Println(result.Address);
+        fmt.Println("to");
+        fmt.Println(resultLID.Address);
+        totalDistance=totalDistance+pe.Prices[0].Distance;
     for _, price := range pe.Prices {
-        fmt.Println(price.DisplayName + ": " + price.Estimate + "; Surge: " + strconv.FormatFloat(price.SurgeMultiplier, 'f', 2, 32))
+        fmt.Println(price.DisplayName + ": "+strconv.Itoa(price.LowEstimate) + "; Surge: " + strconv.FormatFloat(price.Distance , 'f', 2, 32))
     }
         index=index+1;
     }
     
 
-    // fmt.Println(result.City);
+     fmt.Println(totalDistance);
 
 
 
