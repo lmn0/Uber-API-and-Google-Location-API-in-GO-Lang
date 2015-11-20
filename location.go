@@ -36,6 +36,10 @@ Coordinates struct{
 
 var id int;
 var tripId int;
+
+const (
+    APIUrl string = "https://sandbox-api.uber.com/v1/%s%s"
+)
 type Responz struct {
     Results []struct {
         AddressComponents []struct {
@@ -407,6 +411,10 @@ func gettrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
     rw.Write(js)
 }
 
+func requesttrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
+    
+}
+
 
 func main() {
     mux := httprouter.New()
@@ -423,6 +431,7 @@ func main() {
     mux.GET("/locations/:locid",getloc)
     mux.GET("/trips/:tripid",gettrip)
     mux.PUT("/locations/:locid",updateloc)
+    mux.PUT("/trips/:tripid/request",requesttrip)
     mux.DELETE("/locations/:locid",deleteloc)
     server := http.Server{
             Addr:        "0.0.0.0:8083",
