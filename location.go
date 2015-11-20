@@ -11,6 +11,7 @@ import (
     "gopkg.in/mgo.v2/bson"
     "strconv"
     "github.com/anweiss/uber-api-golang/uber"
+    "sort"
     //"bytes"
 )
 
@@ -34,6 +35,7 @@ Coordinates struct{
 }
 
 var id int;
+var tripId int;
 type Responz struct {
     Results []struct {
         AddressComponents []struct {
@@ -64,6 +66,16 @@ type Responz struct {
         Types        []string `json:"types"`
     } `json:"results"`
     Status string `json:"status"`
+}
+
+type TripResponse struct {
+    BestRouteLocationIds   []string `json:"best_route_location_ids"`
+    ID                     string   `json:"id"`
+    StartingFromLocationID string   `json:"starting_from_location_id"`
+    Status                 string   `json:"status"`
+    TotalDistance          float64  `json:"total_distance"`
+    TotalUberCosts         int      `json:"total_uber_costs"`
+    TotalUberDuration      int      `json:"total_uber_duration"`
 }
 
 
@@ -287,9 +299,11 @@ func plantrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
     // distance := []int{};
     // price :=[]float64{};
     index:=0;
-    // totalPrice := 0.0;
+    totalPrice := 0;
     totalDistance :=0.0;
-    // totalDuration :=0.0;
+    totalDuration :=0;
+    bestroute:=make([]float64,len(uUD.LocationIds));
+    m := make(map[float64]string)
 
     for _,ids := range uUD.LocationIds{
     
@@ -314,23 +328,85 @@ func plantrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
         if e := client.Get(pe); e != nil {
             fmt.Println(e);
         }
-        fmt.Println(result.Address);
-        fmt.Println("to");
-        fmt.Println(resultLID.Address);
         totalDistance=totalDistance+pe.Prices[0].Distance;
-    for _, price := range pe.Prices {
-        fmt.Println(price.DisplayName + ": "+strconv.Itoa(price.LowEstimate) + "; Surge: " + strconv.FormatFloat(price.Distance , 'f', 2, 32))
-    }
+        totalDuration=totalDuration+pe.Prices[0].Duration;
+        totalPrice=totalPrice+pe.Prices[0].LowEstimate;
+        bestroute[index]=pe.Prices[0].Distance;
+        m[pe.Prices[0].Distance]=ids;
         index=index+1;
     }
-    
+    //fmt.Println(bestroute[1]);
+    sort.Float64s(bestroute);
+    //fmt.Println(bestroute[1]);
 
-     fmt.Println(totalDistance);
 
+    // fmt.Println(totalDistance);
+    // fmt.Println(totalPrice);
+    // fmt.Println(totalDuration);
 
+    var tripres TripResponse;
 
+    tripId=tripId+1;
+
+     tripres.ID=strconv.Itoa(tripId);
+     tripres.TotalDistance=totalDistance;
+     tripres.TotalUberCosts=totalPrice;
+     tripres.TotalUberDuration=totalDuration;
+     tripres.Status="Planning";
+     tripres.StartingFromLocationID=strconv.Itoa(sid);
+     tripres.BestRouteLocationIds=make([]string,len(uUD.LocationIds));
+     index=0;
+     for _, ind := range bestroute{
+        tripres.BestRouteLocationIds[index]=m[ind];
+        index=index+1;
+     }
+     fmt.Println(tripres.BestRouteLocationIds[1]);
+
+     //Persisting
+
+    c1:=conn.DB("test").C("trips");
+    err = c1.Insert(tripres);
+
+     //Response
+        js,err := json.Marshal(tripres)
+    if err != nil{
+       fmt.Println("Error")
+       return
+    }
+    rw.Header().Set("Content-Type","application/json")
+    rw.Write(js)
 
     }
+
+
+func gettrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
+
+    conn, err := mgo.Dial("mongodb://localhost:27017/mongo")
+
+    // Check if connection error, is mongo running?
+    if err != nil {
+        panic(err)
+    }
+    defer conn.Close();
+
+    conn.SetMode(mgo.Monotonic,true);
+    c:=conn.DB("test").C("trips");
+    result:=TripResponse{}
+    err = c.Find(bson.M{"id":p.ByName("tripid")}).One(&result)
+    if err != nil {
+        fmt.Println(err)
+    }
+
+    //Response
+    js,err := json.Marshal(result)
+    if err != nil{
+       fmt.Println("Error")
+       return
+    }
+    rw.Header().Set("Content-Type","application/json")
+    rw.Write(js)
+}
+
 
 func main() {
     mux := httprouter.New()
@@ -341,9 +417,11 @@ func main() {
 
     ///
     id=0;
+    tripId=0;
     mux.POST("/locations",createlocation)
     mux.POST("/trips",plantrip)
     mux.GET("/locations/:locid",getloc)
+    mux.GET("/trips/:tripid",gettrip)
     mux.PUT("/locations/:locid",updateloc)
     mux.DELETE("/locations/:locid",deleteloc)
     server := http.Server{
