@@ -594,6 +594,7 @@ func requesttrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params)
 
     //Mongo Query   p.ByName("tripid")}
     kid ,err1:= strconv.Atoi(p.ByName("tripid"))
+    var siD int;
     //fmt.Println(id);
     if err1 != nil {
          panic(err1)
@@ -612,17 +613,32 @@ func requesttrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params)
     conn.SetMode(mgo.Monotonic,true);
     c:=conn.DB("test").C("trips");
     result:=TripResponse{}
+
     err = c.Find(bson.M{"id":strconv.Itoa(kid)}).One(&result)
     if err != nil {
         fmt.Println(err)
     }else{
 
+    var iD int;
+
     c1:=conn.DB("test").C("details");
-    iD, err := strconv.Atoi(result.StartingFromLocationID)
-    if err != nil {
+    if currentPos==0{
+        iD, err = strconv.Atoi(result.StartingFromLocationID)
+        siD=iD;
+        if err != nil {
         // handle error
-        fmt.Println(err)
+            fmt.Println(err)
+        }
+    }else
+    {
+        iD, err = strconv.Atoi(result.BestRouteLocationIds[currentPos-1])
+        siD=iD;
+        if err != nil {
+        // handle error
+            fmt.Println(err)
+        }
     }
+
     err = c1.Find(bson.M{"id":iD}).One(&result1)
     if err != nil {
                 fmt.Println(err)
@@ -643,7 +659,7 @@ func requesttrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params)
 
     ogt.ID=strconv.Itoa(ogtID);
     ogt.BestRouteLocationIds=result.BestRouteLocationIds;
-    ogt.StartingFromLocationID=result.StartingFromLocationID;
+    ogt.StartingFromLocationID=strconv.Itoa(siD);
     ogt.NextDestinationLocationID=result.BestRouteLocationIds[currentPos];
     ogt.TotalDistance=result.TotalDistance;
     ogt.TotalUberCosts=result.TotalUberCosts;
