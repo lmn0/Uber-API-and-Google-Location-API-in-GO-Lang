@@ -505,7 +505,24 @@ func plantrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
         index=index+1;
     }
     //fmt.Println(bestroute[1]);
+
+    //Finding the 0 location
+    loc0:=0
+    for _,ind:= range bestroute{
+        if ind==0{
+            break;
+        }
+        loc0=loc0+1;
+    }
+
     sort.Float64s(bestroute);
+    
+    if loc0!=0{
+        for scooch:=0;scooch<loc0;scooch++{
+            bestroute[scooch]=bestroute[scooch+1];
+        }
+        bestroute[loc0]=0;
+    }
     //fmt.Println(bestroute[1]);
 
 
