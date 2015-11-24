@@ -18,7 +18,7 @@ import (
 //    fmt.Fprintf(rw, "Hello, %s!\n", p.ByName("name"))
 //}
 
-// MongoLab Auth : mongodb://tjs:password@ds039684.mongolab.com:39684/mongo
+// MongoLab Auth : mongodb://localhost:27017/mongo
 //UBER SDK
 
 type PriceEstimates struct {
@@ -295,7 +295,7 @@ func createlocation(rw http.ResponseWriter, req *http.Request, p httprouter.Para
 
 //Mongo Persistence
 
- conn, err := mgo.Dial("mongodb://tjs:password@ds039684.mongolab.com:39684/mongo")
+ conn, err := mgo.Dial("mongodb://localhost:27017/mongo")
 
     // Check if connection error, is mongo running?
     if err != nil {
@@ -323,7 +323,7 @@ id ,err1:= strconv.Atoi(p.ByName("locid"))
 if err1 != nil {
         panic(err1)
     }
- conn, err := mgo.Dial("mongodb://tjs:password@ds039684.mongolab.com:39684/mongo")
+ conn, err := mgo.Dial("mongodb://localhost:27017/mongo")
 
     // Check if connection error, is mongo running?
     if err != nil {
@@ -365,7 +365,7 @@ func updateloc(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
  if err1 != nil {
          panic(err1)
      }
-  conn, err := mgo.Dial("mongodb://tjs:password@ds039684.mongolab.com:39684/mongo")
+  conn, err := mgo.Dial("mongodb://localhost:27017/mongo")
 
 //     // Check if connection error, is mongo running?
      if err != nil {
@@ -400,7 +400,7 @@ func deleteloc(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
  if err1 != nil {
          panic(err1)
      }
-  conn, err := mgo.Dial("mongodb://tjs:password@ds039684.mongolab.com:39684/mongo")
+  conn, err := mgo.Dial("mongodb://localhost:27017/mongo")
   conn.SetMode(mgo.Monotonic,true);
 c:=conn.DB("test").C("details");
 
@@ -432,6 +432,7 @@ func plantrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
 
 
 ///UBERRRRRR !!!!
+       
     var options RequestOptions;
     options.ServerToken= "S37TkXJu1TBNbDea22MxgIAjoM1C__fJ3r6vbQ-5";
     options.ClientId= "5-BNiHDpt1CZvQoWd2G2vV2GSvSnIu2j";
@@ -449,7 +450,7 @@ func plantrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
          panic(err1)
      }
 
-    conn, err := mgo.Dial("mongodb://tjs:password@ds039684.mongolab.com:39684/mongo");
+    conn, err := mgo.Dial("mongodb://localhost:27017/mongo");
 
     // Check if connection error, is mongo running?
     if err != nil {
@@ -460,6 +461,7 @@ func plantrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
     conn.SetMode(mgo.Monotonic,true);
     c:=conn.DB("test").C("details");
     result:=reqObj{}
+    prevRe := reqObj{};
     err = c.Find(bson.M{"id":sid}).One(&result)
     if err != nil {
                 fmt.Println(err)
@@ -476,6 +478,7 @@ func plantrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
 
     for _,ids := range uUD.LocationIds{
     
+
         lid,err1:= strconv.Atoi(ids)
             //fmt.Println(id);
         if err1 != nil {
@@ -489,8 +492,14 @@ func plantrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
              fmt.Println(err)
         }
         pe := &PriceEstimates{}
-        pe.StartLatitude = result.Coordinates.Lat;
-        pe.StartLongitude = result.Coordinates.Lng;
+        if index == 0{
+            pe.StartLatitude = result.Coordinates.Lat;
+            pe.StartLongitude = result.Coordinates.Lng;
+        }else{
+            pe.StartLatitude = prevRe.Coordinates.Lat;
+            pe.StartLongitude = prevRe.Coordinates.Lng;
+        }
+
         pe.EndLatitude = resultLID.Coordinates.Lat;
         pe.EndLongitude = resultLID.Coordinates.Lng;
 
@@ -500,28 +509,48 @@ func plantrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
         totalDistance=totalDistance+pe.Prices[0].Distance;
         totalDuration=totalDuration+pe.Prices[0].Duration;
         totalPrice=totalPrice+pe.Prices[0].LowEstimate;
+        fmt.Println(pe.Prices[0].Distance)
         bestroute[index]=pe.Prices[0].Distance;
         m[pe.Prices[0].Distance]=ids;
         index=index+1;
+        prevRe=resultLID;
     }
     //fmt.Println(bestroute[1]);
 
     //Finding the 0 location
     loc0:=0
-    for _,ind:= range bestroute{
-        if ind==0{
+    var val0 float64;
+    for _,ind:= range uUD.LocationIds{
+        if ind==uUD.StartingFromLocationID{
             break;
         }
         loc0=loc0+1;
     }
-
+    val0 = bestroute[loc0];
     sort.Float64s(bestroute);
+    fmt.Println(loc0);
+
+    Loc0:=0
+    for _,ind1:= range bestroute{
+        if ind1 == val0{
+            break;
+        }
+        Loc0 = Loc0+1;
+    }
     
     if loc0!=0{
-        for scooch:=0;scooch<loc0;scooch++{
+        if loc0>Loc0{
+        for scooch:=Loc0;scooch<loc0;scooch++{
             bestroute[scooch]=bestroute[scooch+1];
+            fmt.Println(bestroute[scooch]);
         }
-        bestroute[loc0]=0;
+    }else{
+         for scooch:=Loc0;scooch>loc0;scooch--{
+            bestroute[scooch]=bestroute[scooch-1];
+            fmt.Println(bestroute[scooch]);
+        }
+    }
+        bestroute[loc0]=val0;
     }
     //fmt.Println(bestroute[1]);
 
@@ -567,7 +596,7 @@ func plantrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
 
 func gettrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params){
 
-    conn, err := mgo.Dial("mongodb://tjs:password@ds039684.mongolab.com:39684/mongo")
+    conn, err := mgo.Dial("mongodb://localhost:27017/mongo")
 
     // Check if connection error, is mongo running?
     if err != nil {
@@ -619,7 +648,7 @@ func requesttrip(rw http.ResponseWriter, req *http.Request, p httprouter.Params)
     var ogt OnGoingTrip;
     result1:=reqObj{}
     result2:=reqObj{}
-    conn, err := mgo.Dial("mongodb://tjs:password@ds039684.mongolab.com:39684/mongo")
+    conn, err := mgo.Dial("mongodb://localhost:27017/mongo")
 
     // Check if connection error, is mongo running?
     if err != nil {
